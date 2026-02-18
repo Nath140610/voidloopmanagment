@@ -40,7 +40,6 @@
           <button class="nav-item active" data-page="dashboard">Dashboard</button>
           <button class="nav-item" data-page="users">Utilisateurs</button>
           <button class="nav-item" data-page="logs">Logs</button>
-          <button class="nav-item" data-page="tickets">Tickets</button>
           <button class="nav-item founder-only hidden" data-page="keys">Gestion des cles</button>
           <button class="nav-item" data-page="profile">Profil staff</button>
         </nav>
@@ -74,8 +73,8 @@
               <p id="statOnline">0</p>
             </article>
             <article class="stat-card">
-              <h3>Tickets ouverts</h3>
-              <p id="statTickets">0</p>
+              <h3>Actions 24h</h3>
+              <p id="statActions">0</p>
             </article>
           </div>
           <div class="panel">
@@ -101,11 +100,16 @@
 
           <div class="panel">
             <div class="panel-head">
-              <h3>Actions moderation</h3>
+              <h3>Actions moderation (selection par pseudo)</h3>
             </div>
             <form id="modActionForm" class="stack-form">
-              <label for="targetUserId">ID Utilisateur</label>
-              <input id="targetUserId" required />
+              <label for="targetUserPseudo">Utilisateur Discord</label>
+              <div class="autocomplete-wrap">
+                <input id="targetUserPseudo" autocomplete="off" placeholder="Tape un pseudo (ex: nath)" required />
+                <input id="targetUserId" type="hidden" />
+                <div id="userSuggestions" class="suggestions hidden"></div>
+              </div>
+              <p id="selectedMemberMeta" class="selected-meta">Aucun membre selectionne.</p>
               <label for="actionReason">Raison / note</label>
               <textarea id="actionReason" rows="3" required></textarea>
               <label for="actionDuration">Duree (minutes pour mute, heures pour ban temp)</label>
@@ -145,28 +149,6 @@
               <button id="exportConnectionsCsv">Exporter CSV</button>
             </div>
             <div id="connectionLogs" class="table-wrap"></div>
-          </div>
-        </section>
-
-        <section id="page-tickets" class="page">
-          <div class="panel">
-            <div class="panel-head">
-              <h3>Creer ticket support</h3>
-            </div>
-            <form id="ticketForm" class="stack-form">
-              <label for="ticketSubject">Sujet</label>
-              <input id="ticketSubject" required />
-              <label for="ticketDescription">Description</label>
-              <textarea id="ticketDescription" rows="4" required></textarea>
-              <button type="submit">Creer ticket</button>
-            </form>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <h3>Tickets</h3>
-              <button id="refreshTickets">Rafraichir</button>
-            </div>
-            <div id="ticketList" class="table-wrap"></div>
           </div>
         </section>
 

@@ -1,7 +1,10 @@
 const state = {
   token: localStorage.getItem("vm_token") || null,
   user: null,
-  socket: null
+  socket: null,
+  selectedMember: null,
+  memberSuggestions: [],
+  suggestionTimer: null
 };
 
 const el = {
@@ -18,10 +21,13 @@ const el = {
   userHistory: document.getElementById("userHistory"),
   actionLogs: document.getElementById("actionLogs"),
   connectionLogs: document.getElementById("connectionLogs"),
-  ticketList: document.getElementById("ticketList"),
   keysTable: document.getElementById("keysTable"),
   profileBox: document.getElementById("profileBox"),
-  notificationTray: document.getElementById("notificationTray")
+  notificationTray: document.getElementById("notificationTray"),
+  targetUserPseudo: document.getElementById("targetUserPseudo"),
+  targetUserId: document.getElementById("targetUserId"),
+  userSuggestions: document.getElementById("userSuggestions"),
+  selectedMemberMeta: document.getElementById("selectedMemberMeta")
 };
 
 function hasPermission(permission) {
@@ -73,6 +79,16 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function notify(message, tone = "info") {
+  const item = document.createElement("div");
+  item.className = "notification";
+  if (tone === "error") item.style.borderLeftColor = "var(--danger)";
+  if (tone === "warn") item.style.borderLeftColor = "var(--warning)";
+  item.innerHTML = `<strong>${escapeHtml(message)}</strong>`;
+  el.notificationTray.prepend(item);
+  setTimeout(() => item.remove(), 5200);
+}
+
 function showPage(pageName) {
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.toggle("active", page.id === `page-${pageName}`);
@@ -80,42 +96,17 @@ function showPage(pageName) {
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.page === pageName);
   });
+
   el.pageTitle.textContent = document.querySelector(`.nav-item[data-page="${pageName}"]`)?.textContent || pageName;
 
-  if (pageName === "dashboard") {
-    loadDashboard();
-  }
+  if (pageName === "dashboard") loadDashboard();
   if (pageName === "users") {
     el.memberResults.innerHTML = "";
+    closeSuggestions();
   }
-  if (pageName === "logs") {
-    loadLogs();
-  }
-  if (pageName === "tickets") {
-    loadTickets();
-  }
-  if (pageName === "keys" && state.user?.role === "Fondateur") {
-    loadKeys();
-  }
-  if (pageName === "profile") {
-    loadProfile();
-  }
-}
-
-function notify(message, tone = "info") {
-  const item = document.createElement("div");
-  item.className = "notification";
-  if (tone === "error") {
-    item.style.borderLeftColor = "var(--danger)";
-  }
-  if (tone === "warn") {
-    item.style.borderLeftColor = "var(--warning)";
-  }
-  item.innerHTML = `<strong>${escapeHtml(message)}</strong>`;
-  el.notificationTray.prepend(item);
-  setTimeout(() => {
-    item.remove();
-  }, 5000);
+  if (pageName === "logs") loadLogs();
+  if (pageName === "keys" && state.user?.role === "Fondateur") loadKeys();
+  if (pageName === "profile") loadProfile();
 }
 
 function setAuthenticatedView() {
@@ -161,15 +152,12 @@ async function loadDashboard() {
       return;
     }
 
-    const [stats, recent] = await Promise.all([
-      api("/api/dashboard/stats"),
-      api("/api/dashboard/recent-activity")
-    ]);
+    const [stats, recent] = await Promise.all([api("/api/dashboard/stats"), api("/api/dashboard/recent-activity")]);
 
     document.getElementById("statWarns").textContent = stats.warnCount;
     document.getElementById("statBans").textContent = stats.banCount;
     document.getElementById("statOnline").textContent = stats.staffConnected;
-    document.getElementById("statTickets").textContent = stats.openTickets;
+    document.getElementById("statActions").textContent = stats.actionCount24h;
     renderActivity(recent.activity);
   } catch (error) {
     notify(error.message, "error");
@@ -187,10 +175,10 @@ function renderMemberResults(members) {
       const roles = member.roles.map((role) => escapeHtml(role.name)).join(", ");
       return `
         <tr>
-          <td>${escapeHtml(member.id)}</td>
           <td>${escapeHtml(member.pseudo)}</td>
+          <td>${escapeHtml(member.id)}</td>
           <td>${escapeHtml(roles || "Aucun")}</td>
-          <td><button data-load-user="${escapeHtml(member.id)}">Charger</button></td>
+          <td><button data-select-member="${escapeHtml(member.id)}" data-select-pseudo="${escapeHtml(member.pseudo)}">Selectionner</button></td>
         </tr>
       `;
     })
@@ -198,7 +186,7 @@ function renderMemberResults(members) {
 
   el.memberResults.innerHTML = `
     <table>
-      <thead><tr><th>ID</th><th>Pseudo</th><th>Roles</th><th>Action</th></tr></thead>
+      <thead><tr><th>Pseudo</th><th>ID</th><th>Roles</th><th>Action</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -225,42 +213,100 @@ async function loadUserHistory(userId) {
   }
 }
 
+function setSelectedMember(member) {
+  state.selectedMember = member;
+  el.targetUserId.value = member.id;
+  el.targetUserPseudo.value = member.pseudo;
+  el.selectedMemberMeta.textContent = `Selection: ${member.pseudo} (${member.id})`;
+  closeSuggestions();
+  loadUserHistory(member.id);
+}
+
+function clearSelectedMember() {
+  state.selectedMember = null;
+  el.targetUserId.value = "";
+  el.selectedMemberMeta.textContent = "Aucun membre selectionne.";
+}
+
+function closeSuggestions() {
+  state.memberSuggestions = [];
+  el.userSuggestions.classList.add("hidden");
+  el.userSuggestions.innerHTML = "";
+}
+
+function renderSuggestions() {
+  if (!state.memberSuggestions.length) {
+    closeSuggestions();
+    return;
+  }
+
+  el.userSuggestions.innerHTML = state.memberSuggestions
+    .map(
+      (member) => `
+      <button type="button" class="suggestion-item" data-member-id="${escapeHtml(member.id)}" data-member-pseudo="${escapeHtml(member.pseudo)}">
+        <span>${escapeHtml(member.pseudo)}</span>
+        <small>${escapeHtml(member.id)}</small>
+      </button>
+    `
+    )
+    .join("");
+  el.userSuggestions.classList.remove("hidden");
+}
+
+async function fetchMemberSuggestions(query) {
+  if (!hasPermission("VIEW_MEMBERS")) return;
+
+  if (!query || query.length < 2) {
+    closeSuggestions();
+    return;
+  }
+
+  try {
+    const data = await api(`/api/discord/members?q=${encodeURIComponent(query)}`);
+    state.memberSuggestions = data.members.slice(0, 8);
+    renderSuggestions();
+  } catch (error) {
+    closeSuggestions();
+    notify(error.message, "error");
+  }
+}
+
 async function runModerationAction(action) {
-  const userId = document.getElementById("targetUserId").value.trim();
+  const userId = el.targetUserId.value.trim();
   const reason = document.getElementById("actionReason").value.trim();
   const duration = Number(document.getElementById("actionDuration").value || 0);
 
   if (!userId) {
-    notify("ID utilisateur requis.", "warn");
+    notify("Selectionne un utilisateur via le champ pseudo.", "warn");
     return;
   }
 
   const map = {
-    warn: { endpoint: `/api/discord/member/${userId}/warn`, body: { reason }, perm: "WARN_MEMBER" },
-    note: { endpoint: `/api/discord/member/${userId}/note`, body: { note: reason }, perm: "ADD_NOTE" },
+    warn: { endpoint: `/api/discord/member/${encodeURIComponent(userId)}/warn`, body: { reason }, perm: "WARN_MEMBER" },
+    note: { endpoint: `/api/discord/member/${encodeURIComponent(userId)}/note`, body: { note: reason }, perm: "ADD_NOTE" },
     mute: {
-      endpoint: `/api/discord/member/${userId}/mute-temp`,
+      endpoint: `/api/discord/member/${encodeURIComponent(userId)}/mute-temp`,
       body: { reason, durationMinutes: duration || 10 },
       perm: "TEMP_MUTE"
     },
-    kick: { endpoint: `/api/discord/member/${userId}/kick`, body: { reason }, perm: "KICK_MEMBER" },
+    kick: { endpoint: `/api/discord/member/${encodeURIComponent(userId)}/kick`, body: { reason }, perm: "KICK_MEMBER" },
     "ban-request": {
-      endpoint: `/api/discord/member/${userId}/ban-request`,
+      endpoint: `/api/discord/member/${encodeURIComponent(userId)}/ban-request`,
       body: { reason },
       perm: "REQUEST_BAN"
     },
     "ban-temp": {
-      endpoint: `/api/discord/member/${userId}/ban-temp`,
+      endpoint: `/api/discord/member/${encodeURIComponent(userId)}/ban-temp`,
       body: { reason, durationHours: duration || 1 },
       perm: "TEMP_BAN"
     },
     "ban-perm": {
-      endpoint: `/api/discord/member/${userId}/ban`,
+      endpoint: `/api/discord/member/${encodeURIComponent(userId)}/ban`,
       body: { reason },
       perm: "PERM_BAN"
     },
     unban: {
-      endpoint: `/api/discord/member/${userId}/ban`,
+      endpoint: `/api/discord/member/${encodeURIComponent(userId)}/ban`,
       body: { reason },
       method: "DELETE",
       perm: "REMOVE_BAN"
@@ -276,7 +322,7 @@ async function runModerationAction(action) {
 
   try {
     await api(target.endpoint, { method: target.method || "POST", body: target.body });
-    notify(`Action ${action} executee.`);
+    notify(`Action ${action} executee sur ${state.selectedMember?.pseudo || userId}.`);
     await loadUserHistory(userId);
     await loadDashboard();
   } catch (error) {
@@ -289,12 +335,12 @@ function renderLogsTable(container, rows, headers) {
     container.innerHTML = "<p>Aucune donnee.</p>";
     return;
   }
-  const head = headers.map((h) => `<th>${escapeHtml(h.label)}</th>`).join("");
+
+  const head = headers.map((item) => `<th>${escapeHtml(item.label)}</th>`).join("");
   const body = rows
-    .map((row) => {
-      return `<tr>${headers.map((h) => `<td>${escapeHtml(row[h.key] ?? "")}</td>`).join("")}</tr>`;
-    })
+    .map((row) => `<tr>${headers.map((item) => `<td>${escapeHtml(row[item.key] ?? "")}</td>`).join("")}</tr>`)
     .join("");
+
   container.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -350,64 +396,13 @@ async function downloadCsv(endpoint, filename) {
   try {
     const blob = await api(endpoint, { expectBlob: true });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     URL.revokeObjectURL(url);
-  } catch (error) {
-    notify(error.message, "error");
-  }
-}
-
-function renderTickets(tickets) {
-  if (!tickets.length) {
-    el.ticketList.innerHTML = "<p>Aucun ticket.</p>";
-    return;
-  }
-
-  const canManage = hasPermission("MANAGE_TICKETS");
-  const rows = tickets
-    .map((ticket) => {
-      const statusControl = canManage
-        ? `
-          <select data-ticket-status="${escapeHtml(ticket.ticketId)}">
-            <option value="open" ${ticket.status === "open" ? "selected" : ""}>open</option>
-            <option value="in_progress" ${ticket.status === "in_progress" ? "selected" : ""}>in_progress</option>
-            <option value="closed" ${ticket.status === "closed" ? "selected" : ""}>closed</option>
-          </select>
-        `
-        : escapeHtml(ticket.status);
-      return `
-        <tr>
-          <td>${escapeHtml(ticket.ticketId)}</td>
-          <td>${escapeHtml(ticket.subject)}</td>
-          <td>${statusControl}</td>
-          <td>${escapeHtml(ticket.createdBy.pseudo)}</td>
-          <td>${new Date(ticket.updatedAt).toLocaleString("fr-FR")}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  el.ticketList.innerHTML = `
-    <table>
-      <thead><tr><th>ID</th><th>Sujet</th><th>Statut</th><th>Cree par</th><th>Maj</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-async function loadTickets() {
-  try {
-    if (!hasPermission("VIEW_TICKETS")) {
-      el.ticketList.innerHTML = "<p>Permission VIEW_TICKETS requise.</p>";
-      return;
-    }
-    const data = await api("/api/tickets");
-    renderTickets(data.tickets);
   } catch (error) {
     notify(error.message, "error");
   }
@@ -425,9 +420,7 @@ async function loadKeys() {
             <td>${escapeHtml((key.permissions || []).join(", "))}</td>
             <td><span class="pill ${key.isActive ? "active" : "off"}">${key.isActive ? "Active" : "Desactivee"}</span></td>
             <td>
-              <button data-toggle-key="${escapeHtml(key.id)}" data-active="${key.isActive ? "1" : "0"}">
-                ${key.isActive ? "Desactiver" : "Activer"}
-              </button>
+              <button data-toggle-key="${escapeHtml(key.id)}" data-active="${key.isActive ? "1" : "0"}">${key.isActive ? "Desactiver" : "Activer"}</button>
             </td>
           </tr>
         `
@@ -542,9 +535,7 @@ function bindEvents() {
 
   document.getElementById("logoutButton").addEventListener("click", async () => {
     try {
-      if (state.token) {
-        await api("/api/auth/logout", { method: "POST" });
-      }
+      if (state.token) await api("/api/auth/logout", { method: "POST" });
     } catch (_) {
       // no-op
     }
@@ -553,8 +544,7 @@ function bindEvents() {
 
   el.sidebarNav.addEventListener("click", (event) => {
     const button = event.target.closest(".nav-item");
-    if (!button) return;
-    if (button.classList.contains("hidden")) return;
+    if (!button || button.classList.contains("hidden")) return;
     showPage(button.dataset.page);
   });
 
@@ -566,21 +556,60 @@ function bindEvents() {
       notify("Permission VIEW_MEMBERS requise.", "error");
       return;
     }
-    const q = document.getElementById("memberSearchInput").value.trim();
+
     try {
-      const data = await api(`/api/discord/members?q=${encodeURIComponent(q)}`);
+      const query = document.getElementById("memberSearchInput").value.trim();
+      const data = await api(`/api/discord/members?q=${encodeURIComponent(query)}`);
       renderMemberResults(data.members);
     } catch (error) {
       notify(error.message, "error");
     }
   });
 
-  el.memberResults.addEventListener("click", async (event) => {
-    const button = event.target.closest("button[data-load-user]");
+  el.memberResults.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-select-member]");
     if (!button) return;
-    const userId = button.dataset.loadUser;
-    document.getElementById("targetUserId").value = userId;
-    await loadUserHistory(userId);
+
+    setSelectedMember({
+      id: button.dataset.selectMember,
+      pseudo: button.dataset.selectPseudo
+    });
+  });
+
+  el.targetUserPseudo.addEventListener("input", () => {
+    const value = el.targetUserPseudo.value.trim();
+    if (!state.selectedMember || value !== state.selectedMember.pseudo) {
+      clearSelectedMember();
+    }
+
+    if (state.suggestionTimer) {
+      clearTimeout(state.suggestionTimer);
+    }
+    state.suggestionTimer = setTimeout(() => {
+      fetchMemberSuggestions(value);
+    }, 220);
+  });
+
+  el.targetUserPseudo.addEventListener("focus", () => {
+    const value = el.targetUserPseudo.value.trim();
+    if (value.length >= 2) {
+      fetchMemberSuggestions(value);
+    }
+  });
+
+  el.userSuggestions.addEventListener("click", (event) => {
+    const button = event.target.closest(".suggestion-item");
+    if (!button) return;
+    setSelectedMember({
+      id: button.dataset.memberId,
+      pseudo: button.dataset.memberPseudo
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".autocomplete-wrap")) {
+      closeSuggestions();
+    }
   });
 
   document.getElementById("modActionForm").addEventListener("click", (event) => {
@@ -597,49 +626,12 @@ function bindEvents() {
     downloadCsv("/api/logs/connections/export.csv", "connection_logs.csv");
   });
 
-  document.getElementById("ticketForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const subject = document.getElementById("ticketSubject").value.trim();
-    const description = document.getElementById("ticketDescription").value.trim();
-
-    try {
-      await api("/api/tickets", {
-        method: "POST",
-        body: { subject, description }
-      });
-      document.getElementById("ticketSubject").value = "";
-      document.getElementById("ticketDescription").value = "";
-      notify("Ticket cree.");
-      loadTickets();
-    } catch (error) {
-      notify(error.message, "error");
-    }
-  });
-
-  document.getElementById("refreshTickets").addEventListener("click", loadTickets);
-
-  el.ticketList.addEventListener("change", async (event) => {
-    const select = event.target.closest("select[data-ticket-status]");
-    if (!select) return;
-    const ticketId = select.dataset.ticketStatus;
-    const status = select.value;
-    try {
-      await api(`/api/tickets/${encodeURIComponent(ticketId)}/status`, {
-        method: "PATCH",
-        body: { status }
-      });
-      notify(`Statut ticket ${ticketId} mis a jour.`);
-    } catch (error) {
-      notify(error.message, "error");
-      loadTickets();
-    }
-  });
-
   document.getElementById("keyCreateForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const pseudo = document.getElementById("keyPseudo").value.trim();
     const role = document.getElementById("keyRole").value;
     const customKey = document.getElementById("keyCustom").value.trim();
+
     try {
       const result = await api("/api/keys", {
         method: "POST",

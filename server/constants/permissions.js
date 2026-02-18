@@ -3,7 +3,6 @@ const ALL_PERMISSIONS = [
   "VIEW_MEMBERS",
   "VIEW_LOGS",
   "VIEW_CONNECTIONS",
-  "VIEW_TICKETS",
   "WARN_MEMBER",
   "ADD_NOTE",
   "TEMP_MUTE",
@@ -12,8 +11,7 @@ const ALL_PERMISSIONS = [
   "PERM_BAN",
   "REMOVE_BAN",
   "KICK_MEMBER",
-  "MANAGE_KEYS",
-  "MANAGE_TICKETS"
+  "MANAGE_KEYS"
 ];
 
 const ROLE_ORDER = ["Modérateur", "Admin", "SuperAdmin", "Fondateur"];
@@ -22,7 +20,6 @@ const ROLE_DEFAULT_PERMISSIONS = {
   "Modérateur": [
     "VIEW_DASHBOARD",
     "VIEW_MEMBERS",
-    "VIEW_TICKETS",
     "WARN_MEMBER",
     "ADD_NOTE",
     "TEMP_MUTE",
@@ -33,20 +30,17 @@ const ROLE_DEFAULT_PERMISSIONS = {
     "VIEW_DASHBOARD",
     "VIEW_MEMBERS",
     "VIEW_LOGS",
-    "VIEW_TICKETS",
     "WARN_MEMBER",
     "ADD_NOTE",
     "TEMP_MUTE",
     "REQUEST_BAN",
-    "KICK_MEMBER",
-    "MANAGE_TICKETS"
+    "KICK_MEMBER"
   ],
   SuperAdmin: [
     "VIEW_DASHBOARD",
     "VIEW_MEMBERS",
     "VIEW_LOGS",
     "VIEW_CONNECTIONS",
-    "VIEW_TICKETS",
     "WARN_MEMBER",
     "ADD_NOTE",
     "TEMP_MUTE",
@@ -54,8 +48,7 @@ const ROLE_DEFAULT_PERMISSIONS = {
     "TEMP_BAN",
     "PERM_BAN",
     "REMOVE_BAN",
-    "KICK_MEMBER",
-    "MANAGE_TICKETS"
+    "KICK_MEMBER"
   ],
   Fondateur: ["*"]
 };

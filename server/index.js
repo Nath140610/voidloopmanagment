@@ -12,7 +12,6 @@ const dashboardRoutes = require("../routes/dashboard");
 const keysRoutes = require("../routes/keys");
 const discordRoutes = require("../routes/discord");
 const logsRoutes = require("../routes/logs");
-const ticketsRoutes = require("../routes/tickets");
 const usersRoutes = require("../routes/users");
 const { initRealtime } = require("./realtime");
 const { initDiscordClient } = require("./utils/discordService");
@@ -68,7 +67,6 @@ async function bootstrap() {
   app.use("/api/keys", keysRoutes);
   app.use("/api/discord", discordRoutes);
   app.use("/api/logs", logsRoutes);
-  app.use("/api/tickets", ticketsRoutes);
   app.use("/api/users", usersRoutes);
 
   const clientPath = path.join(__dirname, "..", "client");

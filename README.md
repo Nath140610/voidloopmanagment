@@ -66,6 +66,7 @@ Le panel sera disponible sur `http://localhost:5000`.
 - Export CSV des logs actions/connexions
 - Gestion Discord:
   - recherche membres
+  - auto-completion pseudo pour selectionner un membre (sans taper son ID)
   - profil membre
   - warn + compteur
   - notes internes
@@ -73,7 +74,6 @@ Le panel sera disponible sur `http://localhost:5000`.
   - kick
   - demande de ban
   - ban temp / ban definitif / unban (permissions elevees)
-- Tickets support
 - Page activite recente en live (Socket.io)
 - Notifications temps reel pour fondateurs
 
@@ -96,9 +96,6 @@ Le panel sera disponible sur `http://localhost:5000`.
 - `GET /api/logs/connections`
 - `GET /api/logs/actions/export.csv`
 - `GET /api/logs/connections/export.csv`
-- `GET /api/tickets`
-- `POST /api/tickets`
-- `PATCH /api/tickets/:id/status`
 - `GET /api/keys` (fondateur)
 - `POST /api/keys` (fondateur)
 - `PATCH /api/keys/:id/active` (fondateur)
@@ -108,4 +105,4 @@ Le panel sera disponible sur `http://localhost:5000`.
 - `helmet` + `express-rate-limit` + `express-mongo-sanitize`
 - Verification role + permission middleware sur chaque action sensible
 - Token bot Discord via variables d'environnement
-- Clés hashées en base (jamais stockees en clair)
+- Cles hashées en base (jamais stockees en clair)
