@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoidManagment - Staff Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+
+    <div id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-card">
+        <img src="/assets/VoidManagment.png" alt="VoidManagment logo" class="login-logo" />
+        <h1>VoidManagment</h1>
+        <p>Connexion staff par cle de session</p>
+        <label for="sessionKeyInput">Cle de session</label>
+        <input id="sessionKeyInput" name="sessionKey" type="password" autocomplete="off" required />
+        <button type="submit">Se connecter</button>
+        <p id="loginError" class="error-text"></p>
+      </form>
+    </div>
+
+    <div id="app" class="app hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="/assets/VoidManagment.png" alt="VoidManagment logo" />
+          <div>
+            <h2>VoidManagment</h2>
+            <p>Discord Staff Panel</p>
+          </div>
+        </div>
+        <nav id="sidebarNav">
+          <button class="nav-item active" data-page="dashboard">Dashboard</button>
+          <button class="nav-item" data-page="users">Utilisateurs</button>
+          <button class="nav-item" data-page="logs">Logs</button>
+          <button class="nav-item" data-page="tickets">Tickets</button>
+          <button class="nav-item founder-only hidden" data-page="keys">Gestion des cles</button>
+          <button class="nav-item" data-page="profile">Profil staff</button>
+        </nav>
+        <button id="logoutButton" class="logout-button">Deconnexion</button>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <h1 id="pageTitle">Dashboard</h1>
+            <p id="userLabel"></p>
+          </div>
+          <div class="status-wrap">
+            <span class="status-dot"></span>
+            <span id="socketStatus">Live</span>
+          </div>
+        </header>
+
+        <section id="page-dashboard" class="page active">
+          <div class="stats-grid">
+            <article class="stat-card">
+              <h3>Warns</h3>
+              <p id="statWarns">0</p>
+            </article>
+            <article class="stat-card">
+              <h3>Bans actifs</h3>
+              <p id="statBans">0</p>
+            </article>
+            <article class="stat-card">
+              <h3>Staff connectes</h3>
+              <p id="statOnline">0</p>
+            </article>
+            <article class="stat-card">
+              <h3>Tickets ouverts</h3>
+              <p id="statTickets">0</p>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Activite recente (live)</h3>
+              <button id="refreshActivity">Rafraichir</button>
+            </div>
+            <ul id="activityList" class="timeline"></ul>
+          </div>
+        </section>
+
+        <section id="page-users" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Recherche membre Discord</h3>
+            </div>
+            <form id="memberSearchForm" class="inline-form">
+              <input id="memberSearchInput" placeholder="Pseudo ou ID Discord..." />
+              <button type="submit">Rechercher</button>
+            </form>
+            <div id="memberResults" class="table-wrap"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Actions moderation</h3>
+            </div>
+            <form id="modActionForm" class="stack-form">
+              <label for="targetUserId">ID Utilisateur</label>
+              <input id="targetUserId" required />
+              <label for="actionReason">Raison / note</label>
+              <textarea id="actionReason" rows="3" required></textarea>
+              <label for="actionDuration">Duree (minutes pour mute, heures pour ban temp)</label>
+              <input id="actionDuration" type="number" min="1" />
+              <div class="button-grid">
+                <button type="button" data-action="warn">Warn</button>
+                <button type="button" data-action="note">Ajouter note</button>
+                <button type="button" data-action="mute">Mute temp</button>
+                <button type="button" data-action="kick">Kick</button>
+                <button type="button" data-action="ban-request">Demande ban</button>
+                <button type="button" data-action="ban-temp">Ban temp</button>
+                <button type="button" data-action="ban-perm">Ban definitif</button>
+                <button type="button" data-action="unban">Supprimer ban</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Historique utilisateur</h3>
+            </div>
+            <div id="userHistory" class="history-box">Aucun utilisateur charge.</div>
+          </div>
+        </section>
+
+        <section id="page-logs" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Logs actions</h3>
+              <button id="exportActionsCsv">Exporter CSV</button>
+            </div>
+            <div id="actionLogs" class="table-wrap"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Logs connexions</h3>
+              <button id="exportConnectionsCsv">Exporter CSV</button>
+            </div>
+            <div id="connectionLogs" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="page-tickets" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Creer ticket support</h3>
+            </div>
+            <form id="ticketForm" class="stack-form">
+              <label for="ticketSubject">Sujet</label>
+              <input id="ticketSubject" required />
+              <label for="ticketDescription">Description</label>
+              <textarea id="ticketDescription" rows="4" required></textarea>
+              <button type="submit">Creer ticket</button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Tickets</h3>
+              <button id="refreshTickets">Rafraichir</button>
+            </div>
+            <div id="ticketList" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="page-keys" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Creer une cle session</h3>
+            </div>
+            <form id="keyCreateForm" class="stack-form">
+              <label for="keyPseudo">Pseudo</label>
+              <input id="keyPseudo" required />
+              <label for="keyRole">Role</label>
+              <select id="keyRole">
+                <option>Modérateur</option>
+                <option>Admin</option>
+                <option>SuperAdmin</option>
+                <option>Fondateur</option>
+              </select>
+              <label for="keyCustom">Cle personnalisee (optionnel)</label>
+              <input id="keyCustom" />
+              <button type="submit">Generer</button>
+            </form>
+            <p id="newKeyOutput" class="new-key-output"></p>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Liste des cles</h3>
+              <button id="refreshKeys">Rafraichir</button>
+            </div>
+            <div id="keysTable" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="page-profile" class="page">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Profil staff</h3>
+              <button id="refreshProfile">Rafraichir</button>
+            </div>
+            <div id="profileBox"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <aside id="notificationTray" class="notification-tray"></aside>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
