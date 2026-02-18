@@ -18,6 +18,7 @@ const { initRealtime } = require("./realtime");
 const { initDiscordClient } = require("./utils/discordService");
 const { DATA_DIR } = require("./utils/csv");
 const { startTempBanWatcher } = require("./jobs/tempBanExpiry");
+const { normalizeMongoUri, maskMongoUri } = require("./utils/mongoUri");
 
 dotenv.config();
 
@@ -39,7 +40,19 @@ async function bootstrap() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
+  const mongoUri = normalizeMongoUri(process.env.MONGO_URI);
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 15000
+    });
+  } catch (error) {
+    if (/bad auth|authentication failed/i.test(error.message || "")) {
+      throw new Error(
+        `MongoDB auth failed. Verifie MONGO_URI (user/mot de passe) et encode les caracteres speciaux. URI utilisee: ${maskMongoUri(mongoUri)}`
+      );
+    }
+    throw error;
+  }
 
   try {
     await initDiscordClient();
