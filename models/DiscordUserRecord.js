@@ -59,6 +59,4 @@ const discordUserRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-discordUserRecordSchema.index({ discordUserId: 1 });
-
 module.exports = mongoose.model("DiscordUserRecord", discordUserRecordSchema);
